@@ -74,5 +74,3 @@ unit-test:
   image: gitlab-runner-image
   script: |
     run command to start unit tests
-  only:
-    - merge_requests
