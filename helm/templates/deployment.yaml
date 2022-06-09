@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.application }}
+  labels:
+    environment: {{ .Values.environment }}
+    application: {{ .Values.application }}
+spec:
+  replicas: {{ .Values.pod.app.replicaCount }}
+  selector:
+    matchLabels:
+      environment: {{ .Values.environment }}
+      application: {{ .Values.application }}
+  template:
+    metadata:
+      labels:
+        environment: {{ .Values.environment }}
+        application: {{ .Values.application }}
+    spec:
+      containers:
+        - name: {{ .Values.application }}
+          image: {{ .Values.image.app.repository }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          resources:
+            limits:
+              memory: {{ .Values.container.app.limit.memory }}
+            requests:
+              memory: {{ .Values.container.app.request.memory }}
+          ports:
+            - containerPort: {{ .Values.container.app.port }}
+              protocol: TCP
+              name: http
+          livenessProbe:
+            initialDelaySeconds: 5
+            periodSeconds: 1
+            httpGet:
+              path: /
+              port: {{ .Values.container.app.port }}
+      restartPolicy: {{ .Values.container.restartPolicy }}

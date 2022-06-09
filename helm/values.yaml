@@ -1,0 +1,27 @@
+environment: LARAVEL_ENVIRONMENT
+application: LARAVEL_APPLICATION
+
+pod:
+  app:
+    replicaCount: 2
+
+image:
+  app:
+    repository: LARAVEL_IMAGE
+  pullPolicy: IfNotPresent
+
+container:
+  app:
+    port: 80
+    limit:
+      memory: 128M
+      cpu: 100m
+    request:
+      memory: 64M
+      cpu: 10m
+  restartPolicy: Always
+
+service:
+  app:
+    type: LoadBalancer
+    port: 80

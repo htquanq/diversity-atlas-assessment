@@ -1,0 +1,78 @@
+stages:
+  - test
+  - deploy
+
+variables:
+  APPLICATION_NAME: "devesity-atlas-assessment"
+
+.vars-development: &vars-development
+  ENV: "development"
+  IMAGE_URL: account-id-development.dkr.ecr.ap-southeast-1.amazonaws.com/diversity-atlas-assessment:$CI_COMMIT_SHA
+  ACCOUNT_REGION: "ap-southeast-1"
+  AWS_PROFILE: "development-assumable-profile"
+  ACCOUNT_ID: "123456789"
+  KUBE_CONTEXT: "development-context"
+
+.vars-production: &vars-production
+  ENV: "production"
+  IMAGE_URL: account-id-production.dkr.ecr.ap-southeast-1.amazonaws.com/diversity-atlas-assessment:$CI_COMMIT_SHA
+  ACCOUNT_REGION: "ap-southeast-1"
+  AWS_PROFILE: "production-assumable-profile"
+  ACCOUNT_ID: "987654321"
+  KUBE_CONTEXT: "production-context"
+
+.build:
+  before_script: |
+    #!/bin/bash
+    cp .env.example .env
+    variables=$(aws --region ${ACCOUNT_REGION} ssm get-parameters-by-path --path /${APPLICATION_NAME}/${ENV}/api --output json \
+    | jq -r '[.Parameters[] | [(.ARN | split("/")[-1]),"=",.Value]]' | jq -r '.[] | join("")')
+
+    for variable in ${variables[@]}; do
+      key=$(echo "${variable}" | cut -d '=' -f 1)
+      value=$(echo "${variable}" | cut -d '=' -f 2-)
+      sed -i -e "s|${key}=.*|${key}=\"${value}\"|g" .env
+    done
+  script: |
+    docker build -t $CI_COMMIT_SHA -f $CI_PROJECT_DIR/Dockerfile 
+    docker tag $CI_COMMIT_SHA $IMAGE_URL
+    ECR_LOGIN=$(ws ecr get-login-password --region $ACCOUNT_REGION --profile $AWS_PROFILE)
+    docker login --username AWS --password $ECR_LOGIN $ACCOUNT_ID.dkr.ecr.$ACCOUNT_REGION.amazonaws.com
+    docker push $IMAGE_URL
+    sed -i "s^LARAVEL_ENVIRONMENT^${ENV}^g" values.yaml
+    sed -i "s^LARAVEL_APPLICATION^${APPLICATION_NAME}^g" values.yaml
+    sed -i "s^LARAVEL_IMAGE^${IMAGE_URL}^g" values.yaml
+    helm install --kube-context=$KUBE_CONTEXT $APPLICATION_NAME helm/
+
+development:
+  stage: deploy
+  image: gitlab-runner-image
+  dependencies:
+    - unit-test
+  variables:
+    <<: *vars-development
+  extends: .build
+  only:
+    - develop
+
+production:
+  stage: deploy
+  image: gitlab-runner-image
+  dependencies:
+    - unit-test
+  variables:
+    <<: *vars-production
+  extends: .build
+  only:
+    # E.g: 1.0.0
+    - /^(\d+\.)?(\d+\.)?(\*|\d+)$/
+  except:
+    - branches
+
+unit-test:
+  stage: test
+  image: gitlab-runner-image
+  script: |
+    run command to start unit tests
+  only:
+    - merge_requests

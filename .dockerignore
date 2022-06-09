@@ -1,0 +1,7 @@
+Chart.yaml
+values.yaml
+templates/*
+README.md
+.gitignore
+.git/
+.gitlab-ci.yaml
